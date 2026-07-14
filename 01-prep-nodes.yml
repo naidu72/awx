@@ -1,0 +1,49 @@
+---
+- name: Step 1 - Prepare All Nodes for K3s
+  hosts: k3s_cluster
+  become: true
+  tasks:
+    - name: Disable swap memory (Required by K3s)
+      command: dphys-swapfile swapoff
+      ignore_errors: true
+
+    - name: Uninstall dphys-swapfile
+      command: dphys-swapfile uninstall
+      ignore_errors: true
+
+    - name: Disable swap service
+      systemctl:
+        name: dphys-swapfile
+        enabled: false
+        state: stopped
+      ignore_errors: true
+
+    - name: Install nfs-common utility
+      apt:
+        name: nfs-common
+        state: present
+        update_cache: yes
+
+    - name: Check if cgroups are enabled in Raspberry Pi OS
+      stat:
+        path: /boot/firmware/cmdline.txt
+      register: rpi_cmdline
+
+    - name: Enable cgroups on Raspberry Pi OS nodes
+      replace:
+        path: /boot/firmware/cmdline.txt
+        regexp: '^((?!.*cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory).*)$'
+        replace: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
+      when: rpi_cmdline.stat.exists
+
+    - name: Check if cgroups are enabled in Armbian (Rock64)
+      stat:
+        path: /boot/armbianEnv.txt
+      register: armbian_env
+
+    - name: Enable cgroups on Armbian node
+      lineinfile:
+        path: /boot/armbianEnv.txt
+        line: 'extraargs=cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
+        state: present
+      when: armbian_env.stat.exists

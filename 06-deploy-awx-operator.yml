@@ -1,0 +1,36 @@
+---
+- name: Step 6 - Deploy AWX Operator on K3s Cluster
+  hosts: 192.168.0.151
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Add AWX Operator Helm repository
+      kubernetes.core.helm_repository:
+        name: awx-operator
+        repo_url: https://ansible-community.github.io/awx-operator-helm/
+
+    - name: Deploy AWX Operator via Helm
+      kubernetes.core.helm:
+        name: awx-operator
+        chart_ref: awx-operator/awx-operator
+        release_namespace: awx
+        create_namespace: true
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for AWX Operator deployment to be ready
+      ansible.builtin.command:
+        cmd: k3s kubectl rollout status deployment/awx-operator-controller-manager -n awx --timeout=300s
+
+    - name: Deploy AWX Instance Custom Resource
+      ansible.builtin.shell: |
+        k3s kubectl apply -f - <<EOF
+        apiVersion: awx.ansible.com/v1beta1
+        kind: AWX
+        metadata:
+          name: awx-on-k3s
+          namespace: awx
+        spec:
+          service_type: LoadBalancer
+          postgres_storage_class: nfs-client
+          web_persistent_volume_claim_storage_class: nfs-client
+        EOF

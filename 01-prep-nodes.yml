@@ -1,57 +1,56 @@
 ---
-- name: Step 1 - Prepare All Nodes for K3s
+- name: Step 1 - Prepare all cluster nodes for K3s
   hosts: all
   become: true
   tasks:
-    - name: Check if dphys-swapfile exists
-      stat:
-        path: /etc/dphys-swapfile
-      register: swapfile_check
-
-    - name: Disable swap memory
-      command: dphys-swapfile swapoff
-      when: swapfile_check.stat.exists
-      ignore_errors: true
-
-    - name: Uninstall dphys-swapfile
-      command: dphys-swapfile uninstall
-      when: swapfile_check.stat.exists
-      ignore_errors: true
+    - name: Enable passwordless sudo for pi user
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/010_pi-nopasswd
+        content: "pi ALL=(ALL) NOPASSWD:ALL\n"
+        mode: '0440'
 
     - name: Disable swap service
       ansible.builtin.systemd:
         name: dphys-swapfile
-        enabled: false
         state: stopped
-      when: swapfile_check.stat.exists
+        enabled: false
       ignore_errors: true
 
-    - name: Install nfs-common utility
+    - name: Turn off active swap
+      ansible.builtin.command:
+        cmd: swapoff -a
+      ignore_errors: true
+
+    - name: Install required baseline packages
       ansible.builtin.apt:
-        name: nfs-common
+        name:
+          - nfs-common
+          - curl
         state: present
-        update_cache: yes
+        cache_valid_time: 3600
 
-    - name: Check if cgroups file exists on Raspberry Pi OS
-      stat:
+    # Clean up cgroup_disable=memory if present on Raspberry Pi OS
+    - name: Remove cgroup_disable=memory from Raspberry Pi boot params
+      ansible.builtin.replace:
         path: /boot/firmware/cmdline.txt
-      register: rpi_cmdline
+        regexp: 'cgroup_disable=memory'
+        replace: ''
+      ignore_errors: true
 
-    - name: Enable cgroups on Raspberry Pi OS nodes
-      replace:
+    # Inject cgroups into Raspberry Pi OS cmdline.txt
+    - name: Ensure cgroup parameters are present in Raspberry Pi boot params
+      ansible.builtin.replace:
         path: /boot/firmware/cmdline.txt
-        regexp: '^((?!.*cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory).*)$'
+        regexp: '^(.*)(?<!cgroup_enable=memory)$'
         replace: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
-      when: rpi_cmdline.stat.exists
+      when: not ansible_facts['cmdline']['cgroup_enable'] is defined
+      ignore_errors: true
 
-    - name: Check if cgroups file exists on Armbian (Rock64)
-      stat:
+    # Inject cgroups into Armbian /etc/default/armbian-zram-config or cmdline if applicable
+    - name: Add cgroup flags to Armbian extraargs
+      ansible.builtin.lineinfile:
         path: /boot/armbianEnv.txt
-      register: armbian_env
-
-    - name: Enable cgroups on Armbian node
-      lineinfile:
-        path: /boot/armbianEnv.txt
+        regexp: '^extraargs='
         line: 'extraargs=cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
         state: present
-      when: armbian_env.stat.exists
+      ignore_errors: true

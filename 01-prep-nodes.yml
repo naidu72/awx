@@ -1,10 +1,8 @@
 ---
-- name: Step 1 - Prepare all cluster nodes for K3s
+- name: Step 1.1 - Prepare all cluster nodes (Common Setup)
   hosts: all
   become: true
   gather_facts: false
-  vars:
-    ansible_ssh_timeout: 10
   tasks:
     - name: Enable passwordless sudo for pi user
       ansible.builtin.copy:
@@ -17,17 +15,35 @@
         cmd: swapoff -a
       ignore_errors: true
 
-    - name: Remove cgroup_disable=memory from Raspberry Pi boot params
+- name: Step 1.2 - Configure cgroups on Raspberry Pi OS nodes
+  hosts:
+    - 192.168.0.150
+    - 192.168.0.151
+    - 192.168.0.152
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Remove cgroup_disable=memory from Pi boot params
       ansible.builtin.replace:
         path: /boot/firmware/cmdline.txt
         regexp: 'cgroup_disable=memory'
         replace: ''
-      ignore_errors: true
 
-    - name: Ensure cgroup parameters are present in Raspberry Pi boot params
+    - name: Append cgroup flags to Pi cmdline.txt if missing
       ansible.builtin.lineinfile:
         path: /boot/firmware/cmdline.txt
         backrefs: true
-        regexp: '^(.*)$'
+        regexp: '^(.*)(?<!cgroup_enable=memory)$'
         line: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
-      ignore_errors: true
+
+- name: Step 1.3 - Configure cgroups on Rock64 (Armbian)
+  hosts: 192.168.0.154
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Append extraargs to Armbian boot params
+      ansible.builtin.lineinfile:
+        path: /boot/armbianEnv.txt
+        regexp: '^extraargs='
+        line: 'extraargs=cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
+        state: present

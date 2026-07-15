@@ -1,0 +1,30 @@
+---
+- name: Step 4 - Deploy NFS Storage Provisioner on K3s Cluster
+  hosts: 192.168.0.151
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Ensure Helm is installed on the control plane
+      ansible.builtin.shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add NFS subdir-external-provisioner Helm repo
+      kubernetes.core.helm_repository:
+        name: nfs-subdir-external-provisioner
+        repo_url: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+
+    - name: Deploy NFS dynamic provisioner via Helm
+      kubernetes.core.helm:
+        name: nfs-storage
+        chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
+        release_namespace: kube-system
+        values:
+          nfs:
+            server: "192.168.0.151"
+            path: "/mnt/nvme"
+          storageClass:
+            name: nfs-client
+            defaultClass: true
+            archiveOnDelete: false

@@ -22,18 +22,25 @@
             - "image-gc-high-threshold=60"
             - "image-gc-low-threshold=40"
 
-    - name: Configure journald storage in volatile RAM mode (100MB cap)
-      ansible.builtin.ini_file:
+    - name: Ensure [Journal] section header exists in journald.conf
+      ansible.builtin.lineinfile:
         path: /etc/systemd/journald.conf
-        section: Journal
-        option: "{{ item.option }}"
-        value: "{{ item.value }}"
-        no_extra_spaces: true
+        line: '[Journal]'
+        state: present
+        create: true
         mode: '0644'
+
+    - name: Configure volatile RAM logging options
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/journald.conf
+        regexp: "^#?{{ item.key }}="
+        line: "{{ item.key }}={{ item.value }}"
+        insertafter: '^\[Journal\]'
+        state: present
       loop:
-        - { option: 'Storage', value: 'volatile' }
-        - { option: 'SystemMaxUse', value: '100M' }
-        - { option: 'RuntimeMaxUse', value: '100M' }
+        - { key: 'Storage', value: 'volatile' }
+        - { key: 'SystemMaxUse', value: '100M' }
+        - { key: 'RuntimeMaxUse', value: '100M' }
       notify: Restart Journald
 
     - name: Create daily cron job to prune unused container images

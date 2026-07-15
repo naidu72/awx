@@ -32,5 +32,4 @@
         spec:
           service_type: LoadBalancer
           postgres_storage_class: nfs-client
-          web_persistent_volume_claim_storage_class: nfs-client
         EOF

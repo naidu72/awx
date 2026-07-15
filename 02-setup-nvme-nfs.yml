@@ -24,9 +24,10 @@
         line: "/dev/nvme0n1p1  /mnt/nvme  ext4  defaults,noatime  0  2"
         state: present
 
-    - name: Mount all filesystems in fstab
+    - name: Mount NVMe filesystem directly
       ansible.builtin.command:
-        cmd: mount -a
+        cmd: mount /mnt/nvme
+      ignore_errors: true
 
     - name: Install NFS Kernel Server
       ansible.builtin.apt:

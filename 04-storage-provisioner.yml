@@ -20,6 +20,7 @@
         name: nfs-storage
         chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
         release_namespace: kube-system
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
         values:
           nfs:
             server: "192.168.0.151"

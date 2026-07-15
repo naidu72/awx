@@ -9,27 +9,18 @@
         content: "pi ALL=(ALL) NOPASSWD:ALL\n"
         mode: '0440'
 
-    - name: Disable swap service
-      ansible.builtin.systemd:
-        name: dphys-swapfile
-        state: stopped
-        enabled: false
-      ignore_errors: true
-
     - name: Turn off active swap
       ansible.builtin.command:
         cmd: swapoff -a
       ignore_errors: true
 
-    - name: Install required baseline packages
-      ansible.builtin.apt:
+    - name: Install required baseline packages without cache lock
+      ansible.builtin.package:
         name:
           - nfs-common
           - curl
         state: present
-        cache_valid_time: 3600
 
-    # Clean up cgroup_disable=memory if present on Raspberry Pi OS
     - name: Remove cgroup_disable=memory from Raspberry Pi boot params
       ansible.builtin.replace:
         path: /boot/firmware/cmdline.txt
@@ -37,20 +28,10 @@
         replace: ''
       ignore_errors: true
 
-    # Inject cgroups into Raspberry Pi OS cmdline.txt
     - name: Ensure cgroup parameters are present in Raspberry Pi boot params
-      ansible.builtin.replace:
-        path: /boot/firmware/cmdline.txt
-        regexp: '^(.*)(?<!cgroup_enable=memory)$'
-        replace: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
-      when: not ansible_facts['cmdline']['cgroup_enable'] is defined
-      ignore_errors: true
-
-    # Inject cgroups into Armbian /etc/default/armbian-zram-config or cmdline if applicable
-    - name: Add cgroup flags to Armbian extraargs
       ansible.builtin.lineinfile:
-        path: /boot/armbianEnv.txt
-        regexp: '^extraargs='
-        line: 'extraargs=cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
-        state: present
+        path: /boot/firmware/cmdline.txt
+        backrefs: true
+        regexp: '^(.*)$'
+        line: '\1 cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory'
       ignore_errors: true

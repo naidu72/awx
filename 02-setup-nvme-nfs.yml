@@ -1,0 +1,48 @@
+---
+- name: Step 2 - Configure NVMe HAT and NFS Server on pi5one
+  hosts: 192.168.0.151
+  become: true
+  tasks:
+    - name: Enable PCIe Gen 3 in Raspberry Pi 5 config
+      lineinfile:
+        path: /boot/firmware/config.txt
+        line: "{{ item }}"
+        state: present
+      loop:
+        - "dtparam=pciex1"
+        - "dtparam=pciex1_gen=3"
+
+    - name: Ensure mount point directory exists
+      file:
+        path: /mnt/nvme
+        state: directory
+        mode: '0777'
+
+    - name: Format NVMe drive partition to ext4 if needed
+      filesystem:
+        fstype: ext4
+        dev: /dev/nvme0n1p1
+      ignore_errors: true
+
+    - name: Mount NVMe drive to /mnt/nvme
+      ansible.posix.mount:
+        path: /mnt/nvme
+        src: /dev/nvme0n1p1
+        fstype: ext4
+        opts: defaults,noatime
+        state: mounted
+
+    - name: Install NFS Kernel Server
+      apt:
+        name: nfs-kernel-server
+        state: present
+        update_cache: yes
+
+    - name: Configure NFS export directory
+      lineinfile:
+        path: /etc/exports
+        line: '/mnt/nvme 192.168.0.0/24(rw,sync,no_subtree_check,no_root_squash)'
+        state: present
+
+    - name: Export NFS shares and restart NFS server
+      shell: exportfs -ra && systemctl restart nfs-kernel-server

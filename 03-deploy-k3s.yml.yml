@@ -19,7 +19,7 @@
     - name: Wait for primary node to reach Ready state
       ansible.builtin.command: k3s kubectl get node
       register: node_check
-      until: "' Ready ' in node_check.stdout"
+      until: "'Ready' in node_check.stdout"
       retries: 30
       delay: 5
 

@@ -3,12 +3,19 @@
   hosts: all
   become: true
   tasks:
+    - name: Check if dphys-swapfile exists
+      stat:
+        path: /etc/dphys-swapfile
+      register: swapfile_check
+
     - name: Disable swap memory
       command: dphys-swapfile swapoff
+      when: swapfile_check.stat.exists
       ignore_errors: true
 
     - name: Uninstall dphys-swapfile
       command: dphys-swapfile uninstall
+      when: swapfile_check.stat.exists
       ignore_errors: true
 
     - name: Disable swap service
@@ -16,6 +23,7 @@
         name: dphys-swapfile
         enabled: false
         state: stopped
+      when: swapfile_check.stat.exists
       ignore_errors: true
 
     - name: Install nfs-common utility

@@ -1,0 +1,39 @@
+---
+- name: Step 3.1 - Initialize Primary Control Plane (pi5one)
+  hosts: 192.168.0.151
+  become: true
+  tasks:
+    - name: Install K3s primary control plane
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | K3S_TOKEN="cluster-shared-secret-12345" sh -s - server --cluster-init --write-kubeconfig-mode "0644"
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Wait for primary node to become ready
+      ansible.builtin.command: k3s kubectl get node 192.168.0.151
+      register: node_check
+      until: "' Ready ' in node_check.stdout"
+      retries: 20
+      delay: 5
+
+- name: Step 3.2 - Join Secondary Control Plane Nodes (pi5zero, pi4)
+  hosts:
+    - 192.168.0.150
+    - 192.168.0.152
+  become: true
+  tasks:
+    - name: Install and join secondary control plane nodes
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | K3S_TOKEN="cluster-shared-secret-12345" sh -s - server --server https://192.168.0.151:6443 --write-kubeconfig-mode "0644"
+      args:
+        creates: /usr/local/bin/k3s
+
+- name: Step 3.3 - Join Worker Node (rock64)
+  hosts: 192.168.0.154
+  become: true
+  tasks:
+    - name: Install and join agent node
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | K3S_URL="https://192.168.0.151:6443" K3S_TOKEN="cluster-shared-secret-12345" sh -s - agent
+      args:
+        creates: /usr/local/bin/k3s

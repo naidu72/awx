@@ -25,6 +25,9 @@
           nfs:
             server: "192.168.0.151"
             path: "/mnt/nvme"
+            mountOptions:
+              - nolock
+              - local_lock=all
           storageClass:
             name: nfs-client
             defaultClass: true

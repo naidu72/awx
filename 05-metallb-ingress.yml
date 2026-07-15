@@ -18,7 +18,7 @@
 
     - name: Wait for MetalLB controller deployment to be ready
       ansible.builtin.command:
-        cmd: k3s kubectl rollout status deployment/metallb-controller -n kube-system --timeout=90s
+        cmd: k3s kubectl rollout status deployment/metallb-controller -n kube-system --timeout=300s
 
     - name: Configure MetalLB IP Address Pool resource
       kubernetes.core.k8s:

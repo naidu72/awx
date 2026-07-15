@@ -20,30 +20,24 @@
       ansible.builtin.command:
         cmd: k3s kubectl rollout status deployment/metallb-controller -n kube-system --timeout=300s
 
-    - name: Configure MetalLB IP Address Pool resource
-      kubernetes.core.k8s:
-        kubeconfig: /etc/rancher/k3s/k3s.yaml
-        state: present
-        definition:
-          apiVersion: metallb.io/v1beta1
-          kind: IPAddressPool
-          metadata:
-            name: local-ip-pool
-            namespace: kube-system
-          spec:
-            addresses:
-              - 192.168.0.240-192.168.0.250
-
-    - name: Configure MetalLB L2 Advertisement resource
-      kubernetes.core.k8s:
-        kubeconfig: /etc/rancher/k3s/k3s.yaml
-        state: present
-        definition:
-          apiVersion: metallb.io/v1beta1
-          kind: L2Advertisement
-          metadata:
-            name: local-l2-advert
-            namespace: kube-system
-          spec:
-            ipAddressPools:
-              - local-ip-pool
+    - name: Apply MetalLB IP Address Pool and L2 Advertisement
+      ansible.builtin.shell: |
+        k3s kubectl apply -f - <<EOF
+        apiVersion: metallb.io/v1beta1
+        kind: IPAddressPool
+        metadata:
+          name: local-ip-pool
+          namespace: kube-system
+        spec:
+          addresses:
+            - 192.168.0.240-192.168.0.250
+        ---
+        apiVersion: metallb.io/v1beta1
+        kind: L2Advertisement
+        metadata:
+          name: local-l2-advert
+          namespace: kube-system
+        spec:
+          ipAddressPools:
+            - local-ip-pool
+        EOF

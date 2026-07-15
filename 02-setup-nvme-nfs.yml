@@ -4,7 +4,7 @@
   become: true
   tasks:
     - name: Enable PCIe Gen 3 in Raspberry Pi 5 config
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /boot/firmware/config.txt
         line: "{{ item }}"
         state: present
@@ -13,36 +13,32 @@
         - "dtparam=pciex1_gen=3"
 
     - name: Ensure mount point directory exists
-      file:
+      ansible.builtin.file:
         path: /mnt/nvme
         state: directory
         mode: '0777'
 
-    - name: Format NVMe drive partition to ext4 if needed
-      filesystem:
-        fstype: ext4
-        dev: /dev/nvme0n1p1
-      ignore_errors: true
+    - name: Mount NVMe drive to /mnt/nvme via fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/dev/nvme0n1p1  /mnt/nvme  ext4  defaults,noatime  0  2"
+        state: present
 
-    - name: Mount NVMe drive to /mnt/nvme
-      ansible.posix.mount:
-        path: /mnt/nvme
-        src: /dev/nvme0n1p1
-        fstype: ext4
-        opts: defaults,noatime
-        state: mounted
+    - name: Mount all filesystems in fstab
+      ansible.builtin.command:
+        cmd: mount -a
 
     - name: Install NFS Kernel Server
-      apt:
+      ansible.builtin.apt:
         name: nfs-kernel-server
         state: present
         update_cache: yes
 
     - name: Configure NFS export directory
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/exports
         line: '/mnt/nvme 192.168.0.0/24(rw,sync,no_subtree_check,no_root_squash)'
         state: present
 
     - name: Export NFS shares and restart NFS server
-      shell: exportfs -ra && systemctl restart nfs-kernel-server
+      ansible.builtin.shell: exportfs -ra && systemctl restart nfs-kernel-server

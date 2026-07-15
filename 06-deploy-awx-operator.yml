@@ -21,7 +21,7 @@
       ansible.builtin.command:
         cmd: k3s kubectl rollout status deployment/awx-operator-controller-manager -n awx --timeout=300s
 
-    - name: Deploy AWX Instance Custom Resource
+    - name: Deploy AWX Instance Custom Resource with Local Node Affinity
       ansible.builtin.shell: |
         k3s kubectl apply -f - <<EOF
         apiVersion: awx.ansible.com/v1beta1
@@ -32,4 +32,13 @@
         spec:
           service_type: LoadBalancer
           postgres_storage_class: nfs-client
+          postgres_affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - pi5-1
         EOF

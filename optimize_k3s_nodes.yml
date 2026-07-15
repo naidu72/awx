@@ -1,0 +1,49 @@
+---
+- name: Optimize K3s Nodes for Small Storage and Reduce Disk Wear
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+
+    - name: Ensure K3s config directory exists
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        mode: '0755'
+
+    - name: Configure K3s Kubelet Image Garbage Collection thresholds
+      ansible.builtin.blockinfile:
+        path: /etc/rancher/k3s/config.yaml
+        create: true
+        mode: '0644'
+        block: |
+          kubelet-arg:
+            - "image-gc-high-threshold=60"
+            - "image-gc-low-threshold=40"
+
+    - name: Configure journald storage in volatile RAM mode (100MB cap)
+      ansible.builtin.ini_file:
+        path: /etc/systemd/journald.conf
+        section: Journal
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        no_extra_spaces: true
+        mode: '0644'
+      loop:
+        - { option: 'Storage', value: 'volatile' }
+        - { option: 'SystemMaxUse', value: '100M' }
+        - { option: 'RuntimeMaxUse', value: '100M' }
+      notify: Restart Journald
+
+    - name: Create daily cron job to prune unused container images
+      ansible.builtin.cron:
+        name: "Prune unused K3s containerd images"
+        special_time: daily
+        job: "/usr/local/bin/k3s crictl rmi --prune >/dev/null 2>&1"
+
+  handlers:
+    - name: Restart Journald
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted

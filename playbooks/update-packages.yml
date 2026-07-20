@@ -1,0 +1,25 @@
+---
+- name: Update OS packages
+  hosts: all
+  become: true
+  serial: 1
+  tasks:
+    - name: Update apt cache and apply safe upgrades
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: safe
+        autoremove: true
+      register: apt_result
+
+    - name: Show what changed
+      ansible.builtin.debug:
+        msg: "{{ apt_result.stdout_lines | default(['Nothing to upgrade']) | last }}"
+
+    - name: Check if reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Report reboot status
+      ansible.builtin.debug:
+        msg: "{{ 'REBOOT REQUIRED — handle manually for now' if reboot_required.stat.exists else 'No reboot needed' }}"
